@@ -1,8 +1,10 @@
 from app.repositories.dynamodb_repository import DynamoDBRepository
+from app.repositories.s3_repository import S3Repository
 
 class ChatbotRepository:
     def __init__(self):
         self.db = DynamoDBRepository()
+        self.s3 = S3Repository()
     
     def get_messages_by_conversation(self, conversation_id: str):
         gsi_pk = f"CONV#{conversation_id}"
@@ -21,3 +23,9 @@ class ChatbotRepository:
             'created_at': timestamp
         }
         self.db.put_item(item)
+
+    def save_conversation_to_s3(self, conversation_id: str, data: dict):
+        self.s3.save_conversation(conversation_id, data)
+
+    def get_conversation_from_s3(self, conversation_id: str) -> dict:
+        return self.s3.get_conversation(conversation_id)
