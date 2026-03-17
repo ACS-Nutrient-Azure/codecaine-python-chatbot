@@ -3,15 +3,27 @@ from app.repositories.s3_repository import S3Repository
 
 class ChatbotRepository:
     def __init__(self):
-        self.db = DynamoDBRepository()
-        self.s3 = S3Repository()
-    
+        self._db = None
+        self._s3 = None
+
+    @property
+    def db(self):
+        if self._db is None:
+            self._db = DynamoDBRepository()
+        return self._db
+
+    @property
+    def s3(self):
+        if self._s3 is None:
+            self._s3 = S3Repository()
+        return self._s3
+
     def get_messages_by_conversation(self, conversation_id: str):
         gsi_pk = f"CONV#{conversation_id}"
         gsi_sk_prefix = "MSG#"
         return self.db.query_by_gsi(gsi_pk, gsi_sk_prefix)
-    
-    def save_message(self, cognito_id: str, conversation_id: str, message_id: str, 
+
+    def save_message(self, cognito_id: str, conversation_id: str, message_id: str,
                      timestamp: str, is_bot: int, message: str):
         item = {
             'PK': f"USER#{cognito_id}",

@@ -4,13 +4,19 @@ from app.core.config import settings
 
 class S3Repository:
     def __init__(self):
-        self.s3 = boto3.client(
-            's3',
-            region_name=settings.aws_region,
-            aws_access_key_id=settings.aws_access_key_id,
-            aws_secret_access_key=settings.aws_secret_access_key
-        )
+        self._s3 = None
         self.bucket = settings.s3_bucket_name
+
+    @property
+    def s3(self):
+        if self._s3 is None:
+            self._s3 = boto3.client(
+                's3',
+                region_name=settings.aws_region,
+                aws_access_key_id=settings.aws_access_key_id,
+                aws_secret_access_key=settings.aws_secret_access_key
+            )
+        return self._s3
 
     def save_conversation(self, conversation_id: str, data: dict):
         key = f"conversations/{conversation_id}.json"
