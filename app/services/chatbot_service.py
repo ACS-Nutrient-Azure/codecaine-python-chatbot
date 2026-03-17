@@ -58,7 +58,6 @@ class ChatbotService:
             timestamp=bot_timestamp
         )
 
-
     def get_history(self, result_id: str, cognito_id: str) -> ChatHistoryResponse:
         conversation_id = result_id
 

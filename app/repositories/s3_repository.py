@@ -28,3 +28,5 @@ class S3Repository:
             return json.loads(response['Body'].read().decode('utf-8'))
         except self.s3.exceptions.NoSuchKey:
             return None
+        except Exception:
+            return None

@@ -13,6 +13,7 @@ class DynamoDBRepository:
             endpoint_url=endpoint_url
         )
         self.table = self.dynamodb.Table(settings.dynamodb_table_name)
+
     def query_by_pk_sk(self, pk: str, sk_prefix: str = None):
         if sk_prefix:
             condition = Key('PK').eq(pk) & Key('SK').begins_with(sk_prefix)
@@ -35,5 +36,6 @@ class DynamoDBRepository:
     def get_item(self, pk: str, sk: str):
         response = self.table.get_item(Key={'PK': pk, 'SK': sk})
         return response.get('Item')
+
     def put_item(self, item: dict):
         self.table.put_item(Item=item)
