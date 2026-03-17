@@ -10,6 +10,8 @@ security = HTTPBearer()
 
 @lru_cache()
 def get_cognito_public_keys():
+    if not settings.cognito_user_pool_id:
+        raise HTTPException(status_code=500, detail="Cognito user pool not configured")
     keys_url = f"https://cognito-idp.{settings.aws_region}.amazonaws.com/{settings.cognito_user_pool_id}/.well-known/jwks.json"
     response = requests.get(keys_url)
     response.raise_for_status()

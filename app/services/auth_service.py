@@ -34,5 +34,5 @@ class AuthService:
         return UserInfoResponse(
             cognito_id=token_payload['sub'],
             email=token_payload['email'],
-            created_at=token_payload.get('auth_time', '')
+            created_at=str(token_payload.get('auth_time', ''))
         )
