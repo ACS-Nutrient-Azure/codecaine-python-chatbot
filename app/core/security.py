@@ -2,7 +2,6 @@ from fastapi import HTTPException, Security
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import jwt, JWTError
 import requests
-import os
 from functools import lru_cache
 from app.core.config import settings
 
