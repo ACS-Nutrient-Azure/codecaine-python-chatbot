@@ -33,10 +33,7 @@ jobs:
           TAG=$(date -u +%s)
           IMAGE=${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:$TAG
           
-          docker build \
-          --build-arg COGNITO_USER_POOL_ID=${{ secrets.COGNITO_USER_POOL_ID }} \
-          --build-arg COGNITO_CLIENT_ID=${{ secrets.COGNITO_CLIENT_ID }} \
-          -t $IMAGE .
+          docker build -t $IMAGE .
           docker push $IMAGE
           echo "image=$IMAGE" >> $GITHUB_OUTPUT
 
