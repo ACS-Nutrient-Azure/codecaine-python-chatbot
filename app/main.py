@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import auth, chatbot, analysis
+from app.api.router import api_router
 
 app = FastAPI(title="Codecaine Chatbot API", version="1.0.0")
 
@@ -12,10 +12,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(auth.router)
-app.include_router(chatbot.router)
-app.include_router(analysis.router)
+app.include_router(api_router)
 
 @app.get("/")
 def root():
     return {"message": "Codecaine Chatbot API"}
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}

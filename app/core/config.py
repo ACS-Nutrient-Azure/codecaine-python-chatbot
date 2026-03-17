@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     aws_secret_access_key: Optional[str] = None
     dynamodb_table_name: str = "ChatbotData"
     dynamodb_endpoint_url: Optional[str] = None
+    s3_bucket_name: str = "chatbot-conversations"
     cognito_user_pool_id: Optional[str] = None
     cognito_client_id: Optional[str] = None
     jwt_algorithm: str = "RS256"
