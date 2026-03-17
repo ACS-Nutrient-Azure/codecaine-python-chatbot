@@ -17,3 +17,7 @@ app.include_router(api_router)
 @app.get("/")
 def root():
     return {"message": "Codecaine Chatbot API"}
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
