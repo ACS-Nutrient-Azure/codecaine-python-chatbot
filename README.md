@@ -120,7 +120,7 @@ app/
 
 | 메서드 | 경로 | 인증 | 설명 |
 |--------|------|------|------|
-| `GET` | `/api/analysis/history` | ✅ | 분석 히스토리 목록 조회 |
+| `GET` | `/api/chatbot/analysis/history` | ✅ | 분석 히스토리 목록 조회 |
 
 #### `GET /api/analysis/history`
 
