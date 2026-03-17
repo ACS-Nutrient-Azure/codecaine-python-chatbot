@@ -13,7 +13,10 @@ class AnalysisService:
         for item in items:
             # Extract result_id from SK (format: ANALYSIS#timestamp#result_id)
             sk = item.get('SK', '')
-            result_id = int(sk.split('#')[-1]) if '#' in sk else 0
+            try:
+                result_id = int(sk.split('#')[-1]) if '#' in sk else 0
+            except (ValueError, IndexError):
+                result_id = 0
             
             # Parse summary if it's a string
             summary = item.get('chat_summary', {})
