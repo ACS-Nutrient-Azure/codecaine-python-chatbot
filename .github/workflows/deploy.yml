@@ -34,8 +34,8 @@ jobs:
           IMAGE=${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:$TAG
           
           docker build \
-          --build-arg VITE_COGNITO_USER_POOL_ID=${{ secrets.VITE_COGNITO_USER_POOL_ID }} \
-          --build-arg VITE_COGNITO_CLIENT_ID=${{ secrets.VITE_COGNITO_CLIENT_ID }} \
+          --build-arg COGNITO_USER_POOL_ID=${{ secrets.COGNITO_USER_POOL_ID }} \
+          --build-arg COGNITO_CLIENT_ID=${{ secrets.COGNITO_CLIENT_ID }} \
           -t $IMAGE .
           docker push $IMAGE
           echo "image=$IMAGE" >> $GITHUB_OUTPUT
