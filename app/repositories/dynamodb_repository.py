@@ -4,15 +4,27 @@ from app.core.config import settings
 
 class DynamoDBRepository:
     def __init__(self):
-        endpoint_url = getattr(settings, 'dynamodb_endpoint_url', None)
-        self.dynamodb = boto3.resource(
-            'dynamodb',
-            region_name=settings.aws_region,
-            aws_access_key_id=settings.aws_access_key_id,
-            aws_secret_access_key=settings.aws_secret_access_key,
-            endpoint_url=endpoint_url
-        )
-        self.table = self.dynamodb.Table(settings.dynamodb_table_name)
+        self._dynamodb = None
+        self._table = None
+
+    @property
+    def dynamodb(self):
+        if self._dynamodb is None:
+            endpoint_url = getattr(settings, 'dynamodb_endpoint_url', None)
+            self._dynamodb = boto3.resource(
+                'dynamodb',
+                region_name=settings.aws_region,
+                aws_access_key_id=settings.aws_access_key_id,
+                aws_secret_access_key=settings.aws_secret_access_key,
+                endpoint_url=endpoint_url
+            )
+        return self._dynamodb
+
+    @property
+    def table(self):
+        if self._table is None:
+            self._table = self.dynamodb.Table(settings.dynamodb_table_name)
+        return self._table
 
     def query_by_pk_sk(self, pk: str, sk_prefix: str = None):
         if sk_prefix:

@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     cognito_client_id: Optional[str] = None
     jwt_algorithm: str = "RS256"
     skip_auth: bool = False
+    allowed_origins: str = "*"
     
     class Config:
         env_file = ".env"
