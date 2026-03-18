@@ -18,8 +18,8 @@ class S3Repository:
             )
         return self._s3
 
-    def save_conversation(self, conversation_id: str, data: dict):
-        key = f"conversations/{conversation_id}.json"
+    def save_chat_history(self, cognito_id: str, chat_result_id: str, data: dict):
+        key = f"chat-history/{cognito_id}/{chat_result_id}.json"
         self.s3.put_object(
             Bucket=self.bucket,
             Key=key,
@@ -27,8 +27,8 @@ class S3Repository:
             ContentType='application/json'
         )
 
-    def get_conversation(self, conversation_id: str) -> dict:
-        key = f"conversations/{conversation_id}.json"
+    def get_chat_history(self, cognito_id: str, chat_result_id: str) -> dict:
+        key = f"chat-history/{cognito_id}/{chat_result_id}.json"
         try:
             response = self.s3.get_object(Bucket=self.bucket, Key=key)
             return json.loads(response['Body'].read().decode('utf-8'))
