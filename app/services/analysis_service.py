@@ -1,39 +1,31 @@
 import json
-from app.repositories.analysis_repository import AnalysisRepository
+
+from sqlalchemy.orm import Session
+from app.repositories.chatbot_pg_repository import ChatbotPgRepository
 from app.models.analysis import AnalysisHistoryResponse, AnalysisRecord
 
 class AnalysisService:
-    def __init__(self):
-        self.repository = AnalysisRepository()
-    
-    def get_history(self, cognito_id: str, limit: int = 10) -> AnalysisHistoryResponse:
-        items = self.repository.get_user_analysis_results(cognito_id, limit)
-        
-        results = []
-        for item in items:
-            # Extract result_id from SK (format: ANALYSIS#timestamp#result_id)
-            sk = item.get('SK', '')
-            try:
-                result_id = int(sk.split('#')[-1]) if '#' in sk else 0
-            except (ValueError, IndexError):
-                result_id = 0
-            
-            # Parse summary if it's a string
-            summary = item.get('chat_summary', {})
-            if isinstance(summary, str):
+    def __init__(self, db: Session):
+        self.repository = ChatbotPgRepository(db)
+
+    def get_history(self, cognito_id: str, limit: int, offset: int) -> AnalysisHistoryResponse:
+        results = self.repository.get_analysis_history(cognito_id, limit, offset)
+        total = self.repository.get_analysis_count(cognito_id)
+
+        items = []
+        for result in results:
+            summary = {}
+            if result.chat_summary:
                 try:
-                    summary = json.loads(summary)
-                except:
-                    summary = {"title": summary}
-            
-            results.append(AnalysisRecord(
-                result_id=result_id,
-                cognito_id=item.get('PK', '').replace('USER#', ''),
+                    summary = json.loads(result.chat_summary)
+                except (ValueError, TypeError):
+                    summary = {"title": result.chat_summary}
+
+            items.append(AnalysisRecord(
+                result_id=result.chat_result_id,
+                cognito_id=result.cognito_id,
                 summary_jsonb=summary,
-                created_at=item.get('created_at', '')
+                created_at=result.created_at.isoformat() if result.created_at else ""
             ))
-        
-        return AnalysisHistoryResponse(
-            total=len(results),
-            results=results
-        )
+
+        return AnalysisHistoryResponse(total=total, results=items)
