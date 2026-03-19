@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 REGION = os.getenv("AWS_REGION", "ap-northeast-2")
-ENDPOINT = os.getenv("DYNAMODB_ENDPOINT_URL", "http://13.125.230.157:8000")
+ENDPOINT = os.getenv("DYNAMODB_ENDPOINT_URL", "https://dynamodb.ap-northeast-2.amazonaws.com")
 TABLE_NAME = os.getenv("DYNAMODB_TABLE_NAME", "ChatbotData")
 
 dynamodb = boto3.resource(
