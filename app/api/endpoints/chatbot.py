@@ -1,20 +1,28 @@
-from fastapi import APIRouter, Depends, Query
-from app.models.chatbot import ChatMessageRequest, ChatMessageResponse, ChatHistoryResponse
-from app.services.chatbot_service import ChatbotService
-from app.core.security import verify_token
+from fastapi import APIRouter, WebSocket, Query
+from app.services.chatbot_websocket_service import ChatbotWebSocketService
+from app.repositories.s3_repository import S3Repository
 
+ws_router = APIRouter(prefix="/ws/chatbot", tags=["chatbot-websocket"])
 router = APIRouter(prefix="/api/chatbot", tags=["chatbot"])
 
-@router.post("/message", response_model=ChatMessageResponse)
-def send_message(request: ChatMessageRequest, token_payload: dict = Depends(verify_token)):
-    service = ChatbotService()
-    return service.send_message(request)
-
-@router.get("/history/{result_id}", response_model=ChatHistoryResponse)
-def get_history(
-    result_id: str,
-    cognito_id: str = Query(...),
-    token_payload: dict = Depends(verify_token)
+@ws_router.websocket("/{chat_result_id}")
+async def websocket_endpoint(
+    websocket: WebSocket,
+    chat_result_id: str,
+    cognito_id: str = Query(...)
 ):
-    service = ChatbotService()
-    return service.get_history(result_id, cognito_id)
+    service = ChatbotWebSocketService()
+    await service.handle_connection(chat_result_id, cognito_id, websocket)
+
+@router.get("/history/{chat_result_id}")
+async def get_chat_history(
+    chat_result_id: str,
+    cognito_id: str = Query(...)
+):
+    s3_repo = S3Repository()
+    history = s3_repo.get_chat_history(cognito_id, chat_result_id)
+
+    if not history:
+        return {"chat_result_id": chat_result_id, "messages": []}
+
+    return history
