@@ -2,7 +2,7 @@ from fastapi import APIRouter, WebSocket, Query, Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.services.chatbot_websocket_service import ChatbotWebSocketService
 from app.services.chatbot_service import ChatbotService
-from app.repositories.s3_repository import S3Repository
+from app.repositories.chatbot_repository import ChatbotRepository
 from app.models.chatbot import ChatMessageRequest, ChatMessageResponse
 
 ws_router = APIRouter(prefix="/ws/chatbot", tags=["chatbot-websocket"])
@@ -34,8 +34,8 @@ async def get_chat_history(
     chat_result_id: str,
     cognito_id: str = Query(...)
 ):
-    s3_repo = S3Repository()
-    history = s3_repo.get_chat_history(cognito_id, chat_result_id)
+    repository = ChatbotRepository()
+    history = repository.get_conversation(cognito_id, chat_result_id)
 
     if not history:
         return {"chat_result_id": chat_result_id, "messages": []}
