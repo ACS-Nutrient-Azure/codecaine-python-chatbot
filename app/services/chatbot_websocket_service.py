@@ -128,6 +128,14 @@ class ChatbotWebSocketService:
             "timestamp": timestamp
         }
         
+        # 사용자 메시지 먼저 Redis에 저장
+        history = self.repository.get_conversation(cognito_id, chat_result_id) or {"messages": []}
+        history["messages"].append(user_msg)
+        history["chat_result_id"] = chat_result_id
+        history["cognito_id"] = cognito_id
+        history["last_activity"] = timestamp
+        self.repository.save_conversation(cognito_id, chat_result_id, history)
+        
         # Supervisor Agent 호출
         from app.services.chatbot_service import ChatbotService
         from app.services.user_client import get_codef_data
@@ -139,8 +147,6 @@ class ChatbotWebSocketService:
             codef_data = {"codef_health_data": None, "codef_medication_info": None}
         
         # 대화 내역 빌드
-        history = self.repository.get_conversation(cognito_id, chat_result_id) or {"messages": []}
-        history["messages"].append(user_msg)
         chat_history_text = self._build_chat_history(history["messages"])
         
         # Supervisor 호출
@@ -163,12 +169,9 @@ class ChatbotWebSocketService:
         
         await websocket.send_json(bot_msg)
         
-        # Redis에 저장 (락 사용)
+        # 봇 메시지 Redis에 저장
         history["messages"].append(bot_msg)
-        history["chat_result_id"] = chat_result_id
-        history["cognito_id"] = cognito_id
         history["last_activity"] = bot_timestamp
-        
         self.repository.save_conversation(cognito_id, chat_result_id, history)
 
     def _build_chat_history(self, messages: list) -> str:
