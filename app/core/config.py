@@ -19,6 +19,15 @@ class Settings(BaseSettings):
     skip_auth: bool = False
     allowed_origins: str = "*"
     
+    supervisor_agent_arn: str = "placeholder"
+    user_service_url: str = "http://localhost:8000"
+    
+    # Redis
+    redis_host: str = "localhost"
+    redis_port: int = 6379
+    redis_password: str = ""
+    redis_db: int = 0
+    
     class Config:
         env_file = ".env"
 
