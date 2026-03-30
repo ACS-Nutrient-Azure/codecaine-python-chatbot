@@ -72,6 +72,9 @@ class ChatbotService:
         codef_health_data: dict | None,
         codef_medication_info: list | None
     ) -> str:
+        import logging
+        logger = logging.getLogger(__name__)
+        
         if settings.supervisor_agent_arn == "placeholder":
             return "Supervisor Agent ARN이 설정되지 않았습니다."
         
@@ -82,6 +85,8 @@ class ChatbotService:
             "codef_medication_info": codef_medication_info or [],
             "chat_history": chat_history,
         }
+        
+        logger.info(f"[{cognito_id}] Supervisor Agent 호출 시작: ARN={settings.supervisor_agent_arn}")
         
         # HTTP URL이면 직접 호출 (로컬 테스트용)
         if settings.supervisor_agent_arn.startswith("http"):
@@ -95,11 +100,18 @@ class ChatbotService:
             return response.json().get("response", "")
         
         # AgentCore ARN이면 boto3 호출 (실제 배포용)
-        client = self._boto_session.client("bedrock-agentcore")
-        response = client.invoke_agent_runtime(
-            agentRuntimeArn=settings.supervisor_agent_arn,
-            payload=json.dumps(payload, ensure_ascii=False),
-        )
-        raw = response["response"].read()
-        result = json.loads(raw)
-        return result.get("response", "")
+        try:
+            client = self._boto_session.client("bedrock-agentcore")
+            response = client.invoke_agent_runtime(
+                agentRuntimeArn=settings.supervisor_agent_arn,
+                payload=json.dumps(payload, ensure_ascii=False),
+            )
+            raw = response["response"].read()
+            result = json.loads(raw)
+            logger.info(f"[{cognito_id}] Supervisor Agent 응답 성공")
+            return result.get("response", "")
+        except Exception as e:
+            logger.error(f"[{cognito_id}] Supervisor Agent 호출 실패: {type(e).__name__}: {e}")
+            logger.error(f"[{cognito_id}] ARN: {settings.supervisor_agent_arn}")
+            logger.error(f"[{cognito_id}] Payload keys: {list(payload.keys())}")
+            return "죄송합니다. 일시적인 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
