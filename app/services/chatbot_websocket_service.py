@@ -156,7 +156,7 @@ class ChatbotWebSocketService:
         
         # CODEF 데이터 가져오기 (토큰 있으면)
         if token:
-            codef_data = get_codef_data(cognito_id, token)
+            codef_data = await asyncio.to_thread(get_codef_data, cognito_id, token)
         else:
             codef_data = {"codef_health_data": None, "codef_medication_info": None}
         
