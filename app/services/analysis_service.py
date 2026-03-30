@@ -1,4 +1,5 @@
 import json
+
 from sqlalchemy.orm import Session
 from app.repositories.chatbot_pg_repository import ChatbotPgRepository
 from app.models.analysis import AnalysisHistoryResponse, AnalysisRecord
