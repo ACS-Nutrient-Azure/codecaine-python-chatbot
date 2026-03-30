@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 def get_codef_data(cognito_id: str, token: str) -> dict:
     """
     user 서비스에서 CODEF 데이터 조회.
+    실패 시 빈 값 반환하여 분석 계속 진행.
 
     Returns:
         {
@@ -24,7 +25,7 @@ def get_codef_data(cognito_id: str, token: str) -> dict:
         response = httpx.get(
             url,
             headers={"Authorization": f"Bearer {token}"},
-            timeout=10,
+            timeout=60,
         )
         response.raise_for_status()
         data = response.json()
@@ -34,8 +35,8 @@ def get_codef_data(cognito_id: str, token: str) -> dict:
             "codef_medication_info": data.get("medications", []),
         }
     except httpx.HTTPStatusError as e:
-        logger.warning(f"[{cognito_id}] user 서비스 CODEF 데이터 조회 실패 (HTTP {e.response.status_code})")
+        logger.warning(f"[{cognito_id}] user 서비스 CODEF 데이터 조회 실패 (HTTP {e.response.status_code}) — 빈 값으로 진행")
     except Exception as e:
-        logger.warning(f"[{cognito_id}] user 서비스 호출 실패: {e}")
+        logger.warning(f"[{cognito_id}] user 서비스 호출 실패: {e} — 빈 값으로 진행")
 
-    return {"codef_health_data": None, "codef_medication_info": None}
+    return {"codef_health_data": {}, "codef_medication_info": []}

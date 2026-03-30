@@ -78,8 +78,8 @@ class ChatbotService:
         payload = {
             "cognito_id": cognito_id,
             "chat_result_id": int(chat_result_id),
-            "codef_health_data": codef_health_data,
-            "codef_medication_info": codef_medication_info,
+            "codef_health_data": codef_health_data or {},
+            "codef_medication_info": codef_medication_info or [],
             "chat_history": chat_history,
         }
         
