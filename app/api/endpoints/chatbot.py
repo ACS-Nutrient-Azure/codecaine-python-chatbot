@@ -13,10 +13,11 @@ _bearer = HTTPBearer()
 async def websocket_endpoint(
     websocket: WebSocket,
     chat_result_id: str,
-    cognito_id: str = Query(...)
+    cognito_id: str = Query(...),
+    token: str = Query(None)
 ):
     service = ChatbotWebSocketService()
-    await service.handle_connection(chat_result_id, cognito_id, websocket)
+    await service.handle_connection(chat_result_id, cognito_id, websocket, token)
 
 @router.post("/message", response_model=ChatMessageResponse)
 async def send_message(
