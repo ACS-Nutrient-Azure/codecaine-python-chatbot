@@ -83,32 +83,46 @@ class ChatbotWebSocketService:
         self.repository = ChatbotRepository()
 
     async def handle_connection(self, chat_result_id: str, cognito_id: str, websocket: WebSocket, token: str = None):
-        await ws_manager.connect(chat_result_id, websocket)
-        
-        # 대화 내역 로드 (Redis → S3)
-        history = self.repository.get_conversation(cognito_id, chat_result_id)
-        if history:
-            await websocket.send_json({
-                "type": "history",
-                "messages": history.get("messages", [])
-            })
-        
-        # 30분 무활동 타이머 시작
-        ws_manager.reset_session_timer(chat_result_id, cognito_id, self.repository)
-        
-        heartbeat_task = asyncio.create_task(self._heartbeat(websocket))
+        import logging
+        logger = logging.getLogger(__name__)
         
         try:
-            while True:
-                data = await websocket.receive_json()
-                if data.get("type") == "pong":
-                    continue
-                # 메시지 수신 시 타이머 리셋
-                ws_manager.reset_session_timer(chat_result_id, cognito_id, self.repository)
-                await self._process_message(chat_result_id, cognito_id, data, websocket, token)
-        except Exception:
-            heartbeat_task.cancel()
-            ws_manager.disconnect(chat_result_id, cognito_id, self.repository)
+            await ws_manager.connect(chat_result_id, websocket)
+            logger.info(f"WebSocket connected: chat_result_id={chat_result_id}, cognito_id={cognito_id}")
+            
+            # 대화 내역 로드 (Redis → S3)
+            try:
+                history = self.repository.get_conversation(cognito_id, chat_result_id)
+                if history:
+                    await websocket.send_json({
+                        "type": "history",
+                        "messages": history.get("messages", [])
+                    })
+                    logger.info(f"History loaded: {len(history.get('messages', []))} messages")
+            except Exception as e:
+                logger.error(f"Failed to load history: {e}", exc_info=True)
+            
+            # 30분 무활동 타이머 시작
+            ws_manager.reset_session_timer(chat_result_id, cognito_id, self.repository)
+            
+            heartbeat_task = asyncio.create_task(self._heartbeat(websocket))
+            
+            try:
+                while True:
+                    data = await websocket.receive_json()
+                    logger.info(f"Received message: {data}")
+                    if data.get("type") == "pong":
+                        continue
+                    # 메시지 수신 시 타이머 리셋
+                    ws_manager.reset_session_timer(chat_result_id, cognito_id, self.repository)
+                    await self._process_message(chat_result_id, cognito_id, data, websocket, token)
+            except Exception as e:
+                logger.error(f"Error in message loop: {e}", exc_info=True)
+                heartbeat_task.cancel()
+                ws_manager.disconnect(chat_result_id, cognito_id, self.repository)
+        except Exception as e:
+            logger.error(f"Fatal error in handle_connection: {e}", exc_info=True)
+            raise
     
     async def _heartbeat(self, websocket: WebSocket):
         try:
