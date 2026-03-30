@@ -6,12 +6,6 @@ from app.models.chatbot import ChatMessageRequest, ChatMessageResponse, ChatHist
 from app.core.config import settings
 from app.services.user_client import get_codef_data
 
-# bedrock-agentcore 패키지 import (자동 등록)
-try:
-    import bedrock_agentcore
-except ImportError:
-    pass
-
 class ChatbotService:
     def __init__(self):
         self._repository = None
@@ -101,10 +95,11 @@ class ChatbotService:
             return response.json().get("response", "")
         
         # AgentCore ARN이면 boto3 호출 (실제 배포용)
-        client = self._boto_session.client("bedrock-agentcore-runtime")
+        client = self._boto_session.client("bedrock-agentcore")
         response = client.invoke_agent_runtime(
             agentRuntimeArn=settings.supervisor_agent_arn,
             payload=json.dumps(payload, ensure_ascii=False),
         )
-        result = json.loads(response["output"])
+        raw = response["response"].read()
+        result = json.loads(raw)
         return result.get("response", "")
