@@ -82,7 +82,7 @@ class ChatbotWebSocketService:
     def __init__(self):
         self.repository = ChatbotRepository()
 
-    async def handle_connection(self, chat_result_id: str, cognito_id: str, websocket: WebSocket):
+    async def handle_connection(self, chat_result_id: str, cognito_id: str, websocket: WebSocket, token: str = None):
         await ws_manager.connect(chat_result_id, websocket)
         
         # 대화 내역 로드 (Redis → S3)
@@ -105,7 +105,7 @@ class ChatbotWebSocketService:
                     continue
                 # 메시지 수신 시 타이머 리셋
                 ws_manager.reset_session_timer(chat_result_id, cognito_id, self.repository)
-                await self._process_message(chat_result_id, cognito_id, data, websocket)
+                await self._process_message(chat_result_id, cognito_id, data, websocket, token)
         except Exception:
             heartbeat_task.cancel()
             ws_manager.disconnect(chat_result_id, cognito_id, self.repository)
@@ -118,7 +118,7 @@ class ChatbotWebSocketService:
         except Exception:
             pass
 
-    async def _process_message(self, chat_result_id: str, cognito_id: str, data: dict, websocket: WebSocket):
+    async def _process_message(self, chat_result_id: str, cognito_id: str, data: dict, websocket: WebSocket, token: str = None):
         user_message = data.get("message", "")
         timestamp = datetime.utcnow().isoformat() + 'Z'
         
@@ -128,9 +128,31 @@ class ChatbotWebSocketService:
             "timestamp": timestamp
         }
         
-        await asyncio.sleep(1.5)
+        # Supervisor Agent 호출
+        from app.services.chatbot_service import ChatbotService
+        from app.services.user_client import get_codef_data
         
-        bot_response = self._generate_mock_response(user_message, cognito_id)
+        # CODEF 데이터 가져오기 (토큰 있으면)
+        if token:
+            codef_data = get_codef_data(cognito_id, token)
+        else:
+            codef_data = {"codef_health_data": None, "codef_medication_info": None}
+        
+        # 대화 내역 빌드
+        history = self.repository.get_conversation(cognito_id, chat_result_id) or {"messages": []}
+        history["messages"].append(user_msg)
+        chat_history_text = self._build_chat_history(history["messages"])
+        
+        # Supervisor 호출
+        service = ChatbotService()
+        bot_response = service._call_supervisor(
+            cognito_id,
+            chat_result_id,
+            chat_history_text,
+            codef_data.get("codef_health_data"),
+            codef_data.get("codef_medication_info")
+        )
+        
         bot_timestamp = datetime.utcnow().isoformat() + 'Z'
         
         bot_msg = {
@@ -142,13 +164,16 @@ class ChatbotWebSocketService:
         await websocket.send_json(bot_msg)
         
         # Redis에 저장 (락 사용)
-        history = self.repository.get_conversation(cognito_id, chat_result_id) or {"messages": []}
-        history["messages"].extend([user_msg, bot_msg])
+        history["messages"].append(bot_msg)
         history["chat_result_id"] = chat_result_id
         history["cognito_id"] = cognito_id
         history["last_activity"] = bot_timestamp
         
         self.repository.save_conversation(cognito_id, chat_result_id, history)
 
-    def _generate_mock_response(self, user_message: str, cognito_id: str) -> str:
-        return f"[Mock Agent] 사용자({cognito_id})님의 질문 '{user_message}'에 대한 답변입니다. 영양제 관련 추가 질문이 있으시면 말씀해주세요."
+    def _build_chat_history(self, messages: list) -> str:
+        lines = []
+        for msg in messages:
+            role = "사용자" if msg["type"] == "user" else "봇"
+            lines.append(f"{role}: {msg['content']}")
+        return "\n".join(lines)
