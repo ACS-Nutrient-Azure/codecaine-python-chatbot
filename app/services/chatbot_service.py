@@ -1,3 +1,4 @@
+import time
 import json
 import boto3
 from datetime import datetime
@@ -5,6 +6,7 @@ from app.repositories.chatbot_repository import ChatbotRepository
 from app.models.chatbot import ChatMessageRequest, ChatMessageResponse, ChatHistoryResponse, ChatMessage
 from app.core.config import settings
 from app.services.user_client import get_codef_data
+from app.core.metrics import put_metric
 
 class ChatbotService:
     def __init__(self):
@@ -101,6 +103,7 @@ class ChatbotService:
         
         # AgentCore ARN이면 boto3 호출 (실제 배포용)
         try:
+            start = time.time()
             client = self._boto_session.client("bedrock-agentcore")
             response = client.invoke_agent_runtime(
                 agentRuntimeArn=settings.supervisor_agent_arn,
@@ -109,9 +112,12 @@ class ChatbotService:
             raw = response["response"].read()
             result = json.loads(raw)
             logger.info(f"[{cognito_id}] Supervisor Agent 응답 성공")
+            put_metric("agent_invocation_total", 1, extra_dims=[{"Name": "status", "Value": "success"}])            # ✅ 성공 지표 전송
+            put_metric("agent_latency_seconds", time.time() - start, unit="Seconds")
             return result.get("response", "")
         except Exception as e:
             logger.error(f"[{cognito_id}] Supervisor Agent 호출 실패: {type(e).__name__}: {e}")
             logger.error(f"[{cognito_id}] ARN: {settings.supervisor_agent_arn}")
             logger.error(f"[{cognito_id}] Payload keys: {list(payload.keys())}")
+            put_metric("agent_invocation_total", 1, extra_dims=[{"Name": "status", "Value": "error"}])              # ✅ 실패 지표 전송
             return "죄송합니다. 일시적인 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
