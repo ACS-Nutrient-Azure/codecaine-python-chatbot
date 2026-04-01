@@ -20,7 +20,7 @@ def get_codef_data(cognito_id: str, token: str) -> dict:
             "codef_medication_info": [...]
         }
     """
-    url = f"{settings.user_service_url}/api/codef/health-data/{cognito_id}"
+    url = f"{settings.user_service_url}/api/users/codef/health-data/{cognito_id}"
     try:
         response = httpx.get(
             url,
