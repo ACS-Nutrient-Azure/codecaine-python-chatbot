@@ -13,7 +13,7 @@ def put_metric(metric_name: str, value: float, unit: str = "Count", extra_dims: 
         Namespace="CDCI/AgentCore",
         MetricData=[{
             "MetricName": metric_name,
-            "Dimensions": [{"Name": "agent_name", "Value": "chatbot"}] + extra_dims,
+            "Dimensions": [{"Name": "agent_name", "Value": "chatbot-agent"}] + extra_dims,
             "Value": value,
             "Unit": unit,
         }]
