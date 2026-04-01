@@ -160,8 +160,8 @@ class ChatbotWebSocketService:
         else:
             codef_data = {"codef_health_data": None, "codef_medication_info": None}
         
-        # 대화 내역 빌드
-        chat_history_text = self._build_chat_history(history["messages"])
+        # 현재 사용자 메시지만 전달 (이전 대화는 AgentCore Memory가 관리)
+        chat_history_text = f"사용자: {user_message}"
         
         # Supervisor 호출
         service = ChatbotService()

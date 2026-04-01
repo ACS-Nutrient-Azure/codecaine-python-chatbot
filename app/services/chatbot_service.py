@@ -26,7 +26,7 @@ class ChatbotService:
         history = self.repository.get_conversation(request.cognito_id, conversation_id) or {"messages": []}
         history["messages"].append({"type": "user", "content": request.message, "timestamp": timestamp})
         
-        chat_history = self._build_chat_history(history["messages"])
+        chat_history = f"사용자: {request.message}"
         codef_data = get_codef_data(request.cognito_id, token)
         bot_message = self._call_supervisor(
             request.cognito_id,
