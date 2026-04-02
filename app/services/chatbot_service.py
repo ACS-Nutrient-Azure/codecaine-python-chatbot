@@ -25,8 +25,9 @@ class ChatbotService:
 
         history = self.repository.get_conversation(request.cognito_id, conversation_id) or {"messages": []}
         history["messages"].append({"type": "user", "content": request.message, "timestamp": timestamp})
-        
-        chat_history = f"사용자: {request.message}"
+
+        # 전체 대화 히스토리를 포함해서 supervisor에 전달
+        chat_history = self._build_chat_history(history["messages"])
         codef_data = get_codef_data(request.cognito_id, token)
         bot_message = self._call_supervisor(
             request.cognito_id,
@@ -82,7 +83,7 @@ class ChatbotService:
         
         payload = {
             "cognito_id": cognito_id,
-            "chat_result_id": int(chat_result_id),
+            "chat_result_id": int(chat_result_id) if str(chat_result_id).isdigit() else 0,
             "codef_health_data": codef_health_data or {},
             "codef_medication_info": codef_medication_info or [],
             "chat_history": chat_history,
