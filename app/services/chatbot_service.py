@@ -103,8 +103,12 @@ class ChatbotService:
         
         # AgentCore ARN이면 boto3 호출 (실제 배포용)
         try:
+            from botocore.config import Config
             start = time.time()
-            client = self._boto_session.client("bedrock-agentcore")
+            client = self._boto_session.client(
+                "bedrock-agentcore",
+                config=Config(read_timeout=300, connect_timeout=10),
+            )
             response = client.invoke_agent_runtime(
                 agentRuntimeArn=settings.supervisor_agent_arn,
                 payload=json.dumps(payload, ensure_ascii=False),
