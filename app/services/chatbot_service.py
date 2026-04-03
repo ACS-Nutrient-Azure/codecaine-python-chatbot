@@ -1,6 +1,8 @@
 import time
+import uuid
 import json
 import boto3
+import logging
 from datetime import datetime
 
 
@@ -18,6 +20,49 @@ def _get_xray_trace_header() -> str:
         return f"Root=1-{trace_hex[:8]}-{trace_hex[8:]};Parent={span_hex};Sampled={sampled}"
     except Exception:
         return ""
+
+
+_xray_client = None
+_chatbot_logger = logging.getLogger(__name__)
+
+
+def _get_xray_client():
+    global _xray_client
+    if _xray_client is None:
+        from app.core.config import settings
+        _xray_client = boto3.client("xray", region_name=settings.aws_region)
+    return _xray_client
+
+
+def _send_xray_segment(start_time: float, end_time: float, success: bool) -> None:
+    """
+    ECS cdci-prd-chatbot → AgentCore cdci-prd-supervisor-agent 호출을 X-Ray에 직접 기록.
+    OTEL sidecar가 장기 요청 span을 누락하는 문제를 보완한다.
+    """
+    try:
+        trace_id = f"1-{int(start_time):08x}-{uuid.uuid4().hex[:24]}"
+        segment = {
+            "id": uuid.uuid4().hex[:16],
+            "name": "cdci-prd-chatbot",
+            "trace_id": trace_id,
+            "start_time": start_time,
+            "end_time": end_time,
+            "fault": not success,
+            "aws": {"xray.origin": "AWS::ECS::Fargate"},
+            "subsegments": [{
+                "id": uuid.uuid4().hex[:16],
+                "name": "cdci-prd-supervisor-agent",
+                "start_time": start_time,
+                "end_time": end_time,
+                "namespace": "remote",
+                "fault": not success,
+            }],
+        }
+        _get_xray_client().put_trace_segments(
+            TraceSegmentDocuments=[json.dumps(segment)]
+        )
+    except Exception as exc:
+        _chatbot_logger.warning("X-Ray segment send failed: %s", exc)
 from app.repositories.chatbot_repository import ChatbotRepository
 from app.models.chatbot import ChatMessageRequest, ChatMessageResponse, ChatHistoryResponse, ChatMessage
 from app.core.config import settings
@@ -135,10 +180,12 @@ class ChatbotService:
             logger.info(f"[{cognito_id}] Supervisor Agent 응답 성공")
             put_metric("agent_invocation_total", 1, extra_dims=[{"Name": "status", "Value": "success"}])            # ✅ 성공 지표 전송
             put_metric("agent_latency_seconds", time.time() - start, unit="Seconds")
+            _send_xray_segment(start, time.time(), success=True)
             return result.get("response", "")
         except Exception as e:
             logger.error(f"[{cognito_id}] Supervisor Agent 호출 실패: {type(e).__name__}: {e}")
             logger.error(f"[{cognito_id}] ARN: {settings.supervisor_agent_arn}")
             logger.error(f"[{cognito_id}] Payload keys: {list(payload.keys())}")
             put_metric("agent_invocation_total", 1, extra_dims=[{"Name": "status", "Value": "error"}])              # ✅ 실패 지표 전송
+            _send_xray_segment(start, time.time(), success=False)
             return "죄송합니다. 일시적인 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
