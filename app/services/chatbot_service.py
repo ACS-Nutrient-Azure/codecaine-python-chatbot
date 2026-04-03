@@ -2,6 +2,22 @@ import time
 import json
 import boto3
 from datetime import datetime
+
+
+def _get_xray_trace_header() -> str:
+    """현재 OTEL span의 trace context를 X-Amzn-Trace-Id 형식으로 반환."""
+    try:
+        from opentelemetry import trace as otel_trace
+        span = otel_trace.get_current_span()
+        ctx = span.get_span_context()
+        if not ctx.is_valid:
+            return ""
+        trace_hex = format(ctx.trace_id, '032x')
+        span_hex = format(ctx.span_id, '016x')
+        sampled = "1" if ctx.trace_flags.sampled else "0"
+        return f"Root=1-{trace_hex[:8]}-{trace_hex[8:]};Parent={span_hex};Sampled={sampled}"
+    except Exception:
+        return ""
 from app.repositories.chatbot_repository import ChatbotRepository
 from app.models.chatbot import ChatMessageRequest, ChatMessageResponse, ChatHistoryResponse, ChatMessage
 from app.core.config import settings
@@ -86,6 +102,7 @@ class ChatbotService:
             "codef_health_data": codef_health_data or {},
             "codef_medication_info": codef_medication_info or [],
             "chat_history": chat_history,
+            "_xray_trace": _get_xray_trace_header(),
         }
         
         logger.info(f"[{cognito_id}] Supervisor Agent 호출 시작: ARN={settings.supervisor_agent_arn}")
