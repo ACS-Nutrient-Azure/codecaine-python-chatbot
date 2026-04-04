@@ -1,5 +1,4 @@
 import time
-import uuid
 import json
 import boto3
 import logging
@@ -20,45 +19,6 @@ def _get_xray_trace_header() -> str:
         return f"Root=1-{trace_hex[:8]}-{trace_hex[8:]};Parent={span_hex};Sampled={sampled}"
     except Exception:
         return ""
-
-
-_chatbot_logger = logging.getLogger(__name__)
-
-
-def _send_xray_segment(start_time: float, end_time: float, success: bool) -> None:
-    """
-    ECS cdci-prd-chatbot → AgentCore cdci-prd-supervisor-agent 호출을 X-Ray에 기록.
-    OTEL sidecar의 awsxrayreceiver(UDP 2000)를 통해 전송 → OTEL sidecar가 X-Ray API로 forwarding.
-    """
-    import socket
-    try:
-        trace_id = f"1-{int(start_time):08x}-{uuid.uuid4().hex[:24]}"
-        segment = {
-            "id": uuid.uuid4().hex[:16],
-            "name": "cdci-prd-chatbot",
-            "trace_id": trace_id,
-            "start_time": start_time,
-            "end_time": end_time,
-            "fault": not success,
-            "origin": "AWS::ECS::Fargate",
-            "subsegments": [{
-                "id": uuid.uuid4().hex[:16],
-                "name": "cdci-prd-supervisor-agent",
-                "start_time": start_time,
-                "end_time": end_time,
-                "namespace": "remote",
-                "fault": not success,
-            }],
-        }
-        header = b'{"format": "json", "version": 1}\n'
-        doc = header + json.dumps(segment).encode("utf-8")
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        try:
-            sock.sendto(doc, ("127.0.0.1", 2000))
-        finally:
-            sock.close()
-    except Exception as exc:
-        _chatbot_logger.warning("X-Ray UDP send failed: %s", exc)
 from app.repositories.chatbot_repository import ChatbotRepository
 from app.models.chatbot import ChatMessageRequest, ChatMessageResponse, ChatHistoryResponse, ChatMessage
 from app.core.config import settings
@@ -161,7 +121,6 @@ class ChatbotService:
         
         # AgentCore ARN이면 boto3 호출 (실제 배포용)
         start = time.time()
-        success = False
         try:
             from botocore.config import Config
             client = self._boto_session.client(
@@ -177,7 +136,6 @@ class ChatbotService:
             logger.info(f"[{cognito_id}] Supervisor Agent 응답 성공")
             put_metric("agent_invocation_total", 1, extra_dims=[{"Name": "status", "Value": "success"}])
             put_metric("agent_latency_seconds", time.time() - start, unit="Seconds")
-            success = True
             return result.get("response", "")
         except Exception as e:
             logger.error(f"[{cognito_id}] Supervisor Agent 호출 실패: {type(e).__name__}: {e}")
@@ -185,34 +143,3 @@ class ChatbotService:
             logger.error(f"[{cognito_id}] Payload keys: {list(payload.keys())}")
             put_metric("agent_invocation_total", 1, extra_dims=[{"Name": "status", "Value": "error"}])
             return "죄송합니다. 일시적인 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
-        finally:
-            end = time.time()
-            _send_xray_segment(start, end, success=success)
-            try:
-                from opentelemetry import trace as otel_trace
-                from opentelemetry.context import Context
-                tracer = otel_trace.get_tracer(__name__)
-                root = tracer.start_span(
-                    "cdci-prd-chatbot",
-                    context=Context(),
-                    kind=otel_trace.SpanKind.SERVER,
-                    start_time=int(start * 1e9),
-                    attributes={"http.method": "POST", "http.route": "/chat/message"},
-                )
-                root_ctx = otel_trace.set_span_in_context(root)
-                child = tracer.start_span(
-                    "cdci-prd-supervisor-agent",
-                    context=root_ctx,
-                    kind=otel_trace.SpanKind.CLIENT,
-                    start_time=int(start * 1e9),
-                    attributes={
-                        "peer.service": "cdci-prd-supervisor-agent",
-                        "rpc.system":   "aws-api",
-                        "rpc.service":  "bedrock-agentcore",
-                        "error":        not success,
-                    },
-                )
-                child.end(end_time=int(end * 1e9))
-                root.end(end_time=int(end * 1e9))
-            except Exception as otel_err:
-                logger.debug("OTEL span 생성 실패: %s", otel_err)
