@@ -50,7 +50,8 @@ def _send_xray_segment(start_time: float, end_time: float, success: bool) -> Non
                 "fault": not success,
             }],
         }
-        doc = json.dumps(segment).encode("utf-8")
+        header = b'{"format": "json", "version": 1}\n'
+        doc = header + json.dumps(segment).encode("utf-8")
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         try:
             sock.sendto(doc, ("127.0.0.1", 2000))
