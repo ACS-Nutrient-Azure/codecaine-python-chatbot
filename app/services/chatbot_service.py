@@ -160,28 +160,39 @@ class ChatbotService:
             return response.json().get("response", "")
         
         # AgentCore ARN이면 boto3 호출 (실제 배포용)
-        try:
-            from botocore.config import Config
-            start = time.time()
-            client = self._boto_session.client(
-                "bedrock-agentcore",
-                config=Config(read_timeout=300, connect_timeout=10),
-            )
-            response = client.invoke_agent_runtime(
-                agentRuntimeArn=settings.supervisor_agent_arn,
-                payload=json.dumps(payload, ensure_ascii=False),
-            )
-            raw = response["response"].read()
-            result = json.loads(raw)
-            logger.info(f"[{cognito_id}] Supervisor Agent 응답 성공")
-            put_metric("agent_invocation_total", 1, extra_dims=[{"Name": "status", "Value": "success"}])            # ✅ 성공 지표 전송
-            put_metric("agent_latency_seconds", time.time() - start, unit="Seconds")
-            _send_xray_segment(start, time.time(), success=True)
-            return result.get("response", "")
-        except Exception as e:
-            logger.error(f"[{cognito_id}] Supervisor Agent 호출 실패: {type(e).__name__}: {e}")
-            logger.error(f"[{cognito_id}] ARN: {settings.supervisor_agent_arn}")
-            logger.error(f"[{cognito_id}] Payload keys: {list(payload.keys())}")
-            put_metric("agent_invocation_total", 1, extra_dims=[{"Name": "status", "Value": "error"}])              # ✅ 실패 지표 전송
-            _send_xray_segment(start, time.time(), success=False)
-            return "죄송합니다. 일시적인 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
+        from opentelemetry import trace as otel_trace
+        tracer = otel_trace.get_tracer(__name__)
+
+        start = time.time()
+        with tracer.start_as_current_span(
+            "cdci-prd-supervisor-agent",
+            kind=otel_trace.SpanKind.CLIENT,
+        ) as span:
+            span.set_attribute("peer.service", "cdci-prd-supervisor-agent")
+            span.set_attribute("rpc.system", "aws-api")
+            span.set_attribute("rpc.service", "bedrock-agentcore")
+            try:
+                from botocore.config import Config
+                client = self._boto_session.client(
+                    "bedrock-agentcore",
+                    config=Config(read_timeout=300, connect_timeout=10),
+                )
+                response = client.invoke_agent_runtime(
+                    agentRuntimeArn=settings.supervisor_agent_arn,
+                    payload=json.dumps(payload, ensure_ascii=False),
+                )
+                raw = response["response"].read()
+                result = json.loads(raw)
+                logger.info(f"[{cognito_id}] Supervisor Agent 응답 성공")
+                put_metric("agent_invocation_total", 1, extra_dims=[{"Name": "status", "Value": "success"}])            # ✅ 성공 지표 전송
+                put_metric("agent_latency_seconds", time.time() - start, unit="Seconds")
+                _send_xray_segment(start, time.time(), success=True)
+                return result.get("response", "")
+            except Exception as e:
+                span.record_exception(e)
+                logger.error(f"[{cognito_id}] Supervisor Agent 호출 실패: {type(e).__name__}: {e}")
+                logger.error(f"[{cognito_id}] ARN: {settings.supervisor_agent_arn}")
+                logger.error(f"[{cognito_id}] Payload keys: {list(payload.keys())}")
+                put_metric("agent_invocation_total", 1, extra_dims=[{"Name": "status", "Value": "error"}])              # ✅ 실패 지표 전송
+                _send_xray_segment(start, time.time(), success=False)
+                return "죄송합니다. 일시적인 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
